@@ -1,5 +1,6 @@
 # tugas2-vue-ut
 📁 Struktur Proyek tugas2-vue-ut/
+```
 tugas2-vue-ut/
 ├─ index.html          ← Landing page dengan navigasi
 ├─ stok.html           ← Halaman 1: Stok Bahan Ajar
@@ -10,6 +11,7 @@ tugas2-vue-ut/
    ├─ dataBahanAjar.js ← Dummy data (extended dari file asli)
    ├─ stok-app.js      ← Logic Vue untuk stok.html
    └─ tracking-app.js  ← Logic Vue untuk tracking.html
+```
 
 ✅ Fitur yang Diimplementasikan per Indikator
 IndikatorImplementasi1. Arsitektur VuePemisahan file: HTML, CSS, JS terpisah rapi; Vue instance per halaman2. Data Binding & Directivev-model, v-bind, v-html, v-for, mustaches {{ }}, v-text3. Conditionalv-if / v-else-if / v-else untuk status stok & DO; v-show untuk filter/modal4. Computed & MethodsfilteredStok (cached), kategoriTersedia, nextNoDO, selectedPaket, totalHargaTerpilih, statsDO, dll5. Watchers (min. 2)Stok: 3 watcher di stok-app + 3 watcher di tracking-app (perubahan filter, deep watch data, auto-fill tanggal)6. Formulir & ValidasiForm tambah/edit bahan ajar + form tambah DO, semua dengan validasi input + pesan error per field7. Kreativitas UITema dark navy dengan badge warna, timeline perjalanan, accordion DO card, stats bar, watcher log
