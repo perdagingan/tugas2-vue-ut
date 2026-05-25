@@ -1,0 +1,410 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Stok Bahan Ajar — SITTA UT</title>
+  <link rel="stylesheet" href="css/style.css" />
+</head>
+<body>
+
+  <!-- NAVBAR -->
+  <header class="navbar">
+    <a href="index.html" class="brand">SITTA <span>UT</span></a>
+    <nav>
+      <a href="index.html">Home</a>
+      <a href="stok.html" class="active">Stok Bahan Ajar</a>
+      <a href="tracking.html">Tracking DO</a>
+    </nav>
+  </header>
+
+  <!-- VUE APP -->
+  <div id="stok-app" class="page-wrap">
+
+    <!-- Page Header -->
+    <div class="page-header flex justify-between items-center flex-wrap gap-8">
+      <div>
+        <h1>📦 Stok Bahan Ajar</h1>
+        <p>Kelola dan pantau stok bahan ajar seluruh UT daerah</p>
+      </div>
+      <button class="btn btn-primary" v-on:click="bukaModalTambah">
+        ＋ Tambah Bahan Ajar
+      </button>
+    </div>
+
+    <!-- Stats Row -->
+    <div class="flex flex-wrap gap-12 mb-16">
+      <div class="card" style="flex:1;min-width:150px;text-align:center;">
+        <div style="font-size:28px;font-weight:800;color:var(--accent)">{{ stok.length }}</div>
+        <div class="text-muted" style="font-size:12px;margin-top:4px;">Total Item MK</div>
+      </div>
+      <div class="card" style="flex:1;min-width:150px;text-align:center;">
+        <div style="font-size:28px;font-weight:800;color:var(--accent2)">{{ totalStok }}</div>
+        <div class="text-muted" style="font-size:12px;margin-top:4px;">Total Stok Buku</div>
+      </div>
+      <div class="card" style="flex:1;min-width:150px;text-align:center;">
+        <div style="font-size:28px;font-weight:800;"
+             v-bind:style="{ color: jumlahReorder > 0 ? 'var(--warning)' : 'var(--success)' }">
+          {{ jumlahReorder }}
+        </div>
+        <div class="text-muted" style="font-size:12px;margin-top:4px;">Perlu Re-Order</div>
+      </div>
+      <div class="card" style="flex:1;min-width:150px;text-align:center;">
+        <div style="font-size:28px;font-weight:800;color:var(--text)">{{ filteredStok.length }}</div>
+        <div class="text-muted" style="font-size:12px;margin-top:4px;">Ditampilkan</div>
+      </div>
+    </div>
+
+    <!-- FILTER BAR -->
+    <div class="card mb-16">
+      <div class="card-title">🔍 Filter &amp; Urutan</div>
+      <div class="filter-bar">
+
+        <!-- Filter UPBJJ -->
+        <div class="filter-group">
+          <label>UT-Daerah (UPBJJ)</label>
+          <select v-model="filterUpbjj" style="min-width:170px;">
+            <option value="">— Semua Daerah —</option>
+            <option v-for="upbjj in upbjjList" v-bind:value="upbjj">{{ upbjj }}</option>
+          </select>
+        </div>
+
+        <!-- Filter Kategori (dependent: muncul hanya saat upbjj dipilih) -->
+        <div class="filter-group" v-show="filterUpbjj">
+          <label>Kategori MK</label>
+          <select v-model="filterKategori" style="min-width:170px;">
+            <option value="">— Semua Kategori —</option>
+            <option v-for="kat in kategoriTersedia" v-bind:value="kat">{{ kat }}</option>
+          </select>
+        </div>
+
+        <!-- Sort -->
+        <div class="filter-group">
+          <label>Urutkan</label>
+          <select v-model="sortField" style="min-width:160px;">
+            <option value="">— Tidak Diurutkan —</option>
+            <option value="judul">Judul (A-Z / Z-A)</option>
+            <option value="qty">Stok</option>
+            <option value="harga">Harga</option>
+          </select>
+        </div>
+
+        <!-- Sort asc/desc -->
+        <div class="filter-group" v-show="sortField">
+          <label>Arah</label>
+          <select v-model="sortAsc" style="min-width:120px;">
+            <option v-bind:value="true">↑ Naik</option>
+            <option v-bind:value="false">↓ Turun</option>
+          </select>
+        </div>
+
+        <!-- Checkbox Reorder -->
+        <div class="filter-group" style="justify-content:flex-end;">
+          <label class="checkbox-label" style="margin-top:20px;">
+            <input type="checkbox" v-model="filterReorder" />
+            🔔 Hanya Stok Kritis (Re-Order)
+          </label>
+        </div>
+
+        <!-- Reset Button -->
+        <div class="filter-group" style="justify-content:flex-end;">
+          <button class="btn btn-ghost" style="margin-top:18px;" v-on:click="resetFilter">↺ Reset</button>
+        </div>
+
+      </div><!-- /filter-bar -->
+
+      <!-- Info filter aktif -->
+      <div v-show="filterUpbjj || filterKategori || filterReorder || sortField"
+           class="alert alert-warning" style="margin-top:4px;">
+        ℹ️
+        <span v-if="filterUpbjj">Daerah: <strong>{{ filterUpbjj }}</strong></span>
+        <span v-if="filterKategori">&nbsp;· Kategori: <strong>{{ filterKategori }}</strong></span>
+        <span v-if="filterReorder">&nbsp;· <strong>Stok Kritis Aktif</strong></span>
+        <span v-if="sortField">&nbsp;· Urut: <strong>{{ sortField }} {{ sortAsc ? '↑' : '↓' }}</strong></span>
+      </div>
+
+    </div><!-- /card filter -->
+
+    <!-- TABEL STOK -->
+    <div class="card">
+      <div class="card-title">📋 Daftar Stok Bahan Ajar</div>
+
+      <!-- Empty state -->
+      <div v-if="filteredStok.length === 0" class="empty-state">
+        <div class="icon">📭</div>
+        <div>Tidak ada data yang sesuai filter.</div>
+        <button class="btn btn-ghost" style="margin-top:12px;" v-on:click="resetFilter">Reset Filter</button>
+      </div>
+
+      <div v-else class="table-wrap">
+        <table>
+          <thead>
+            <tr>
+              <th>Kode MK</th>
+              <th class="sortable" v-on:click="setSort('judul')"
+                  v-bind:class="{ 'sort-active': sortField === 'judul' }">
+                Nama MK <span class="sort-arrow">{{ sortIcon('judul') }}</span>
+              </th>
+              <th>Kategori</th>
+              <th>UT-Daerah</th>
+              <th>Lokasi Rak</th>
+              <th class="sortable" v-on:click="setSort('qty')"
+                  v-bind:class="{ 'sort-active': sortField === 'qty' }">
+                Stok <span class="sort-arrow">{{ sortIcon('qty') }}</span>
+              </th>
+              <th>Safety</th>
+              <th class="sortable" v-on:click="setSort('harga')"
+                  v-bind:class="{ 'sort-active': sortField === 'harga' }">
+                Harga <span class="sort-arrow">{{ sortIcon('harga') }}</span>
+              </th>
+              <th>Status</th>
+              <th>Catatan</th>
+              <th>Aksi</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr v-for="(item, idx) in filteredStok" v-bind:key="item.kode">
+              <td class="code-cell">{{ item.kode }}</td>
+              <td class="title-cell">{{ item.judul }}</td>
+              <td>
+                <span style="background:var(--navy-light);border:1px solid var(--border);border-radius:5px;padding:2px 8px;font-size:11.5px;">
+                  {{ item.kategori }}
+                </span>
+              </td>
+              <td>{{ item.upbjj }}</td>
+              <td class="code-cell">{{ item.lokasiRak }}</td>
+              <td>
+                <!-- Warna qty berdasarkan status -->
+                <span class="qty-badge"
+                  v-bind:style="{
+                    color: item.qty === 0 ? 'var(--danger)' : item.qty < item.safety ? 'var(--warning)' : 'var(--success)',
+                    borderColor: item.qty === 0 ? 'var(--danger)' : item.qty < item.safety ? 'var(--warning)' : 'var(--success)'
+                  }">
+                  {{ item.qty }}
+                </span>
+              </td>
+              <td class="text-muted">{{ item.safety }}</td>
+              <td class="harga-cell">{{ formatHarga(item.harga) }}</td>
+              <td>
+                <!-- Status dengan v-if / v-else-if / v-else -->
+                <span v-bind:class="getStatusClass(item)">
+                  <span v-if="item.qty === 0">🔴 Kosong</span>
+                  <span v-else-if="item.qty < item.safety">🟠 Menipis</span>
+                  <span v-else>🟢 Aman</span>
+                </span>
+              </td>
+              <td style="max-width:180px;font-size:12.5px;" v-html="item.catatanHTML"></td>
+              <td>
+                <button class="btn btn-warning btn-sm" v-on:click="bukaModalEdit(item, idx)">
+                  ✏️ Edit
+                </button>
+              </td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+
+    </div><!-- /card tabel -->
+
+    <!-- Watcher Log (debug / demonstrasi) -->
+    <div class="card" style="margin-top:20px;" v-show="watcherLog.length > 0">
+      <div class="card-title">🔭 Log Watcher (Vue.js)</div>
+      <div v-for="log in watcherLog" style="font-size:12px;padding:4px 0;border-bottom:1px solid var(--border);display:flex;gap:10px;">
+        <span class="code-cell" style="min-width:65px;">{{ log.waktu }}</span>
+        <span class="text-muted">{{ log.pesan }}</span>
+      </div>
+    </div>
+
+    <!-- ═══════════════════════════════════════════════════════
+         MODAL: TAMBAH BAHAN AJAR BARU
+         ═══════════════════════════════════════════════════════ -->
+    <div class="modal-overlay" v-show="showTambahModal" v-on:click.self="tutupModalTambah">
+      <div class="modal-box">
+        <div class="modal-header">
+          <h3>➕ Tambah Bahan Ajar Baru</h3>
+          <button class="modal-close" v-on:click="tutupModalTambah">✕</button>
+        </div>
+
+        <!-- Success message -->
+        <div class="alert alert-success" v-show="successMsg">✅ {{ successMsg }}</div>
+
+        <div class="form-grid">
+          <!-- Kode MK -->
+          <div class="form-row">
+            <label>Kode MK *</label>
+            <input type="text" v-model="formBaru.kode" placeholder="Contoh: EKMA4116"
+                   v-bind:class="{ 'is-invalid': formErrors.kode }" />
+            <span class="error-msg" v-show="formErrors.kode">{{ formErrors.kode }}</span>
+          </div>
+
+          <!-- Judul -->
+          <div class="form-row">
+            <label>Judul Mata Kuliah *</label>
+            <input type="text" v-model="formBaru.judul" placeholder="Masukkan judul MK"
+                   v-bind:class="{ 'is-invalid': formErrors.judul }" />
+            <span class="error-msg" v-show="formErrors.judul">{{ formErrors.judul }}</span>
+          </div>
+
+          <!-- Kategori -->
+          <div class="form-row">
+            <label>Kategori *</label>
+            <select v-model="formBaru.kategori" v-bind:class="{ 'is-invalid': formErrors.kategori }">
+              <option value="">— Pilih Kategori —</option>
+              <option v-for="kat in kategoriList" v-bind:value="kat">{{ kat }}</option>
+            </select>
+            <span class="error-msg" v-show="formErrors.kategori">{{ formErrors.kategori }}</span>
+          </div>
+
+          <!-- UPBJJ -->
+          <div class="form-row">
+            <label>UT-Daerah (UPBJJ) *</label>
+            <select v-model="formBaru.upbjj" v-bind:class="{ 'is-invalid': formErrors.upbjj }">
+              <option value="">— Pilih Daerah —</option>
+              <option v-for="u in upbjjList" v-bind:value="u">{{ u }}</option>
+            </select>
+            <span class="error-msg" v-show="formErrors.upbjj">{{ formErrors.upbjj }}</span>
+          </div>
+
+          <!-- Lokasi Rak -->
+          <div class="form-row">
+            <label>Lokasi Rak *</label>
+            <input type="text" v-model="formBaru.lokasiRak" placeholder="Contoh: R1-A3"
+                   v-bind:class="{ 'is-invalid': formErrors.lokasiRak }" />
+            <span class="error-msg" v-show="formErrors.lokasiRak">{{ formErrors.lokasiRak }}</span>
+          </div>
+
+          <!-- Harga -->
+          <div class="form-row">
+            <label>Harga (Rp) *</label>
+            <input type="number" v-model="formBaru.harga" placeholder="Contoh: 65000" min="0"
+                   v-bind:class="{ 'is-invalid': formErrors.harga }" />
+            <span class="error-msg" v-show="formErrors.harga">{{ formErrors.harga }}</span>
+          </div>
+
+          <!-- Qty -->
+          <div class="form-row">
+            <label>Jumlah Stok *</label>
+            <input type="number" v-model="formBaru.qty" placeholder="0" min="0"
+                   v-bind:class="{ 'is-invalid': formErrors.qty }" />
+            <span class="error-msg" v-show="formErrors.qty">{{ formErrors.qty }}</span>
+          </div>
+
+          <!-- Safety -->
+          <div class="form-row">
+            <label>Safety Stock *</label>
+            <input type="number" v-model="formBaru.safety" placeholder="0" min="0"
+                   v-bind:class="{ 'is-invalid': formErrors.safety }" />
+            <span class="error-msg" v-show="formErrors.safety">{{ formErrors.safety }}</span>
+          </div>
+
+          <!-- Catatan HTML -->
+          <div class="form-row full">
+            <label>Catatan (HTML diizinkan)</label>
+            <textarea v-model="formBaru.catatanHTML" placeholder="Opsional. Contoh: <em>Edisi 2024</em>"></textarea>
+          </div>
+
+          <!-- Preview Catatan -->
+          <div class="form-row full" v-show="formBaru.catatanHTML">
+            <label>Preview Catatan</label>
+            <div style="background:var(--navy);border:1px solid var(--border);border-radius:7px;padding:9px 12px;font-size:13px;"
+                 v-html="formBaru.catatanHTML"></div>
+          </div>
+        </div><!-- /form-grid -->
+
+        <hr class="divider" />
+        <div class="flex gap-8" style="justify-content:flex-end;">
+          <button class="btn btn-ghost" v-on:click="tutupModalTambah">Batal</button>
+          <button class="btn btn-primary" v-on:click="simpanTambah">💾 Simpan</button>
+        </div>
+      </div>
+    </div><!-- /modal tambah -->
+
+    <!-- ═══════════════════════════════════════════════════════
+         MODAL: EDIT BAHAN AJAR
+         ═══════════════════════════════════════════════════════ -->
+    <div class="modal-overlay" v-show="showEditModal" v-on:click.self="tutupModalEdit">
+      <div class="modal-box" v-if="formEdit">
+        <div class="modal-header">
+          <h3>✏️ Edit Bahan Ajar</h3>
+          <button class="modal-close" v-on:click="tutupModalEdit">✕</button>
+        </div>
+
+        <div class="alert alert-success" v-show="editSuccessMsg">✅ {{ editSuccessMsg }}</div>
+
+        <div style="margin-bottom:14px;">
+          <span class="text-muted" style="font-size:12px;">Kode MK: </span>
+          <span class="code-cell">{{ formEdit.kode }}</span>
+        </div>
+
+        <div class="form-grid">
+          <div class="form-row full">
+            <label>Judul Mata Kuliah *</label>
+            <input type="text" v-model="formEdit.judul"
+                   v-bind:class="{ 'is-invalid': editErrors.judul }" />
+            <span class="error-msg" v-show="editErrors.judul">{{ editErrors.judul }}</span>
+          </div>
+          <div class="form-row">
+            <label>Kategori *</label>
+            <select v-model="formEdit.kategori" v-bind:class="{ 'is-invalid': editErrors.kategori }">
+              <option v-for="kat in kategoriList" v-bind:value="kat">{{ kat }}</option>
+            </select>
+            <span class="error-msg" v-show="editErrors.kategori">{{ editErrors.kategori }}</span>
+          </div>
+          <div class="form-row">
+            <label>UT-Daerah *</label>
+            <select v-model="formEdit.upbjj" v-bind:class="{ 'is-invalid': editErrors.upbjj }">
+              <option v-for="u in upbjjList" v-bind:value="u">{{ u }}</option>
+            </select>
+            <span class="error-msg" v-show="editErrors.upbjj">{{ editErrors.upbjj }}</span>
+          </div>
+          <div class="form-row">
+            <label>Lokasi Rak *</label>
+            <input type="text" v-model="formEdit.lokasiRak"
+                   v-bind:class="{ 'is-invalid': editErrors.lokasiRak }" />
+            <span class="error-msg" v-show="editErrors.lokasiRak">{{ editErrors.lokasiRak }}</span>
+          </div>
+          <div class="form-row">
+            <label>Harga (Rp) *</label>
+            <input type="number" v-model="formEdit.harga" min="0"
+                   v-bind:class="{ 'is-invalid': editErrors.harga }" />
+            <span class="error-msg" v-show="editErrors.harga">{{ editErrors.harga }}</span>
+          </div>
+          <div class="form-row">
+            <label>Jumlah Stok *</label>
+            <input type="number" v-model="formEdit.qty" min="0"
+                   v-bind:class="{ 'is-invalid': editErrors.qty }" />
+            <span class="error-msg" v-show="editErrors.qty">{{ editErrors.qty }}</span>
+          </div>
+          <div class="form-row">
+            <label>Safety Stock *</label>
+            <input type="number" v-model="formEdit.safety" min="0"
+                   v-bind:class="{ 'is-invalid': editErrors.safety }" />
+            <span class="error-msg" v-show="editErrors.safety">{{ editErrors.safety }}</span>
+          </div>
+          <div class="form-row full">
+            <label>Catatan (HTML diizinkan)</label>
+            <textarea v-model="formEdit.catatanHTML"></textarea>
+          </div>
+          <div class="form-row full" v-show="formEdit.catatanHTML">
+            <label>Preview Catatan</label>
+            <div style="background:var(--navy);border:1px solid var(--border);border-radius:7px;padding:9px 12px;font-size:13px;"
+                 v-html="formEdit.catatanHTML"></div>
+          </div>
+        </div>
+
+        <hr class="divider" />
+        <div class="flex gap-8" style="justify-content:flex-end;">
+          <button class="btn btn-ghost" v-on:click="tutupModalEdit">Batal</button>
+          <button class="btn btn-success" v-on:click="simpanEdit">💾 Perbarui</button>
+        </div>
+      </div>
+    </div><!-- /modal edit -->
+
+  </div><!-- /#stok-app -->
+
+  <!-- SCRIPTS -->
+  <script src="https://cdn.jsdelivr.net/npm/vue@2/dist/vue.js"></script>
+  <script src="js/dataBahanAjar.js"></script>
+  <script src="js/stok-app.js"></script>
+</body>
+</html>
